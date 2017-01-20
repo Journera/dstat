@@ -9,9 +9,12 @@ class dstat_plugin(dstat):
     """
 
     def __init__(self):
+        import errno
+        
         self.nick = ('used', 'free')
         self.open('/etc/mtab')
         self.cols = 2
+        self.errno = errno
 
     def vars(self):
         ret = []
@@ -20,10 +23,16 @@ class dstat_plugin(dstat):
             if l[2] in ('binfmt_misc', 'devpts', 'iso9660', 'none', 'proc', 'sysfs', 'usbfs', 'cgroup', 'tmpfs', 'devtmpfs', 'debugfs', 'mqueue', 'systemd-1', 'rootfs', 'autofs'): continue
             ### FIXME: Excluding 'none' here may not be what people want (/dev/shm)
             if l[0] in ('devpts', 'none', 'proc', 'sunrpc', 'usbfs', 'securityfs', 'hugetlbfs', 'configfs', 'selinuxfs', 'pstore', 'nfsd'): continue
-            name = l[1]
-            res = os.statvfs(name)
-            if res[0] == 0: continue ### Skip zero block filesystems
-            ret.append(name)
+                
+            try:
+                name = l[1]
+                res = os.statvfs(name)
+                if res[0] == 0: continue ### Skip zero block filesystems
+                ret.append(name)
+            except OSError as e:
+                ### If its just an access error, ignore it (maybe we should stderr a warning though?)
+                if e.errno != self.errno.EACCES:
+                    raise
 
             #print l[0] + " / " + name + " / " + l[2]
         return ret
